@@ -47,10 +47,19 @@
 
 (defun dignified-elpa--ws-handler (request)
   (with-slots (process headers) request
-    (let ((params (cadr (assoc "Content" headers))))
-      (setq dignified-elpa--ws-result params)
-      (ws-response-header process 200 '("Content-Type" . "text/html"))
-      (process-send-string process "OK"))))
+    (cond
+     ((equal (cdr (assoc :POST headers)) "/")
+      (let ((account-id (cdr (assoc "account_id" headers)))
+            (onboarding-complete (cdr (assoc "onboarding_complete" headers))))
+        (setq dignified-elpa--ws-result
+              (format "account_id=%s&onboarding_complete=%s" account-id onboarding-complete))
+        (ws-response-header process 200 '("Content-Type" . "text/html"))
+        (process-send-string process
+         (format "<html><body><h1>Onboarding %s</h1><p>Account: %s</p></body></html>"
+                 (if (equal onboarding-complete "true") "Complete" "Incomplete")
+                 account-id))))
+     (t
+      (ws-send-404 process)))))
 
 (defun dignified-elpa-onboard-flow (url _account-id)
   (setq dignified-elpa--ws-result nil)
