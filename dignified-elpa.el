@@ -56,14 +56,11 @@
 ;;;###autoload
 (defun dignify (package)
   (interactive
-   (list (let ((completion-styles '(substring flex))
-               (pkg (completing-read
-                     "Package: " dignified-packages
-                     (lambda (pkg) (null (locate-library (concat (symbol-name pkg) ".el"))))
-                     t)))
-           (if (string-empty-p pkg)
-               (user-error "Package name cannot be empty")
-             pkg))))
+   (list (let ((completion-styles '(substring flex)))
+	   (completing-read
+	    "Package: " dignified-packages
+	    (lambda (pkg) (null (locate-library (concat (symbol-name pkg) ".el"))))
+	    :must-match))))
   (if (member package (mapcar #'symbol-name dignified-packages))
       (dignified-elpa-checkout package)
     (user-error "%s not among dignified packages" package)))
