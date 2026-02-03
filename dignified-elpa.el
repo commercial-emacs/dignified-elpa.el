@@ -56,11 +56,14 @@
 ;;;###autoload
 (defun dignify (package)
   (interactive
-   (list (let ((completion-styles '(substring flex)))
-	   (completing-read
-	    "Package: " dignified-packages
-	    (lambda (pkg) (null (locate-library (concat (symbol-name pkg) ".el"))))
-	    :must-match))))
+   (list (let ((completion-styles '(substring flex))
+               (pkg (completing-read
+                     "Package: " dignified-packages
+                     (lambda (pkg) (null (locate-library (concat (symbol-name pkg) ".el"))))
+                     t)))
+           (if (string-empty-p pkg)
+               (user-error "Package name cannot be empty")
+             pkg))))
   (if (member package (mapcar #'symbol-name dignified-packages))
       (dignified-elpa-checkout package)
     (user-error "%s not among dignified packages" package)))
@@ -129,21 +132,21 @@
      (with-temp-file (concat (file-name-as-directory token-dir) (symbol-name ',token))
        (insert ,(intern (concat "." (symbol-name token))) "\n"))))
 
-(defmacro dignified-elpa-squirrel-tokens (alist)
+(defun dignified-elpa-squirrel-tokens (alist)
   "Return list of tokens changed.
 Side effect squirrel changed tokens to disk."
-  `(let (result)
-     (let-alist ,alist
-       (when .access_token
-	 (dignified-elpa-squirrel access_token)
-	 (push 'access_token result))
-       (when .refresh_token
-	 (dignified-elpa-squirrel refresh_token)
-	 (push 'refresh_token result))
-       (when .id_token
-	 (dignified-elpa-squirrel id_token)
-	 (push 'id_token result))
-       (nreverse result))))
+  (let (result)
+    (let-alist alist
+      (when .access_token
+	(dignified-elpa-squirrel access_token)
+	(push 'access_token result))
+      (when .refresh_token
+	(dignified-elpa-squirrel refresh_token)
+	(push 'refresh_token result))
+      (when .id_token
+	(dignified-elpa-squirrel id_token)
+	(push 'id_token result))
+      (nreverse result))))
 
 (defun dignified-elpa-hosted-ui-flow ()
   "Return t if hosted-ui => elpa_token.php => ws."
@@ -240,38 +243,43 @@ Side effect squirrel changed tokens to disk."
       (dignified-elpa-checkout-flow .url))))
 
 (defun dignified-elpa--auth-get (url)
-  (cl-destructuring-bind (code . buffer)
-      (dignified-elpa--get url)
-    (unwind-protect
-	(let ((notification "Welcome back!"))
-	  (cl-case (/ code 100)
-	    (4 (if (y-or-n-p "Open browser to permission Dignified Elpa? ")
-		   (when (dignified-elpa-hosted-ui-flow)
-		     (setq notification "Welcome to Dignified Elpa!")
-		     (cl-destructuring-bind (code* . buffer*)
-			 (dignified-elpa--get url)
-		       (setq code code*
-			     buffer (prog1 buffer* (when (buffer-live-p buffer)
-						     (kill-buffer buffer))))))
-		 (user-error "That's too bad")))
-	    (5 (error "Server error.  Contact commandlinesystems.com.")))
-	  (if (= 2 (/ code 100))
-	      (with-current-buffer buffer
-		(goto-char url-http-end-of-headers)
-		(condition-case nil
-		    (cons `(notification . ,notification)
-			  (json-parse-buffer :false-object nil
-					     :null-object nil
-					     :array-type 'list
-					     :object-type 'alist))
-		  (json-end-of-file nil)))
-	    (error "dignified-elpa--auth-get %s"
-		   (with-current-buffer buffer
-		     (buffer-substring-no-properties
-		      (point-min)
-		      url-http-end-of-headers)))))
-      (when (buffer-live-p buffer)
-	(kill-buffer buffer)))))
+  (catch 'done
+    (dotimes (_i 2)
+      (let ((result
+	     (cl-destructuring-bind (code . buffer)
+		 (dignified-elpa--get url)
+	       (unwind-protect
+		   (progn
+		     (cl-case (/ code 100)
+		       (4 (if (y-or-n-p "Open browser to permission Dignified Elpa? ")
+			      (when (dignified-elpa-hosted-ui-flow)
+				(cl-destructuring-bind (code* . buffer*)
+				    (dignified-elpa--get url)
+				  (setq code code*
+					buffer (prog1 buffer* (when (buffer-live-p buffer)
+								(kill-buffer buffer))))))
+			    (user-error "That's too bad")))
+		       (5 (error "Server error.  Contact commandlinesystems.com.")))
+		     (if (= 2 (/ code 100))
+			 (with-current-buffer buffer
+			   (goto-char url-http-end-of-headers)
+			   (condition-case nil
+			       (json-parse-buffer :false-object nil
+						  :null-object nil
+						  :array-type 'list
+						  :object-type 'alist)
+			     (json-end-of-file nil)))
+		       (error "dignified-elpa--auth-get %s"
+			      (with-current-buffer buffer
+				(buffer-substring-no-properties
+				 (point-min)
+				 url-http-end-of-headers)))))
+		 (when (buffer-live-p buffer)
+		   (kill-buffer buffer))))))
+	;; if RESULT were a re-auth (causing squirrel to succeed)
+	;; then go round again
+	(unless (dignified-elpa-squirrel-tokens result)
+	  (throw 'done result))))))
 
 (defun dignified-elpa--get (url)
   "Return cons of response code and buffer response.
@@ -299,11 +307,12 @@ Caller must clean it up."
 (defun dignified-elpa-dashboard ()
   (interactive)
   (with-help-window "*Dignified Elpa*"
-    (let-alist (dignified-elpa--auth-get dignified-elpa-purchases-url)
-      (dignified-elpa--align
-	"Notification" ,.notification
-	"User" ,(alist-get 'email (dignified-elpa-id-token-alist))
-	"Purchases" ,(string-join (or .purchases '("None")) ", ")))))
+    (let ((back-p (dignified-elpa-token "id_token")))
+      (let-alist (dignified-elpa--auth-get dignified-elpa-purchases-url)
+	(dignified-elpa--align
+	 "Notification" ,(concat "Welcome " (when back-p "back ") "to Dignified Elpa!")
+	 "User" ,(alist-get 'email (dignified-elpa-id-token-alist))
+	 "Purchases" ,(string-join (or .purchases '("None")) ", "))))))
 
 (defalias 'dignified-elpa #'dignified-elpa-dashboard)
 
