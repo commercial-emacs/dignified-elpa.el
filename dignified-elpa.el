@@ -61,9 +61,10 @@
 	    "Package: " dignified-packages
 	    (lambda (pkg) (null (locate-library (concat (symbol-name pkg) ".el"))))
 	    :must-match))))
-  (if (member package (mapcar #'symbol-name dignified-packages))
-      (dignified-elpa-checkout package)
-    (user-error "%s not among dignified packages" package)))
+  (unless (string-empty-p (string-trim package))
+    (if (member package (mapcar #'symbol-name dignified-packages))
+	(dignified-elpa-checkout package)
+      (user-error "%s not among dignified packages" package))))
 
 (defconst dignified-elpa-domain "dignified-elpa.commandlinesystems.com")
 (defconst dignified-elpa-auth "allaccess.auth.commandlinesystems.com")
@@ -246,7 +247,14 @@ Side effect squirrel changed tokens to disk."
 	     (cl-destructuring-bind (code . buffer)
 		 (dignified-elpa--get url)
 	       (unwind-protect
-		   (progn
+		   (let ((parsed (with-current-buffer buffer
+				   (goto-char url-http-end-of-headers)
+				   (condition-case nil
+				       (json-parse-buffer :false-object nil
+							  :null-object nil
+							  :array-type 'list
+							  :object-type 'alist)
+				     (json-end-of-file nil)))))
 		     (cl-case (/ code 100)
 		       (4 (if (y-or-n-p "Open browser to permission Dignified Elpa? ")
 			      (when (dignified-elpa-hosted-ui-flow)
@@ -256,16 +264,10 @@ Side effect squirrel changed tokens to disk."
 					buffer (prog1 buffer* (when (buffer-live-p buffer)
 								(kill-buffer buffer))))))
 			    (user-error "That's too bad")))
-		       (5 (error "Server error.  Contact commandlinesystems.com.")))
+		       (5 (error "Server error: %s" (or (alist-get 'error parsed)
+							 "Contact commandlinesystems.com"))))
 		     (if (= 2 (/ code 100))
-			 (with-current-buffer buffer
-			   (goto-char url-http-end-of-headers)
-			   (condition-case nil
-			       (json-parse-buffer :false-object nil
-						  :null-object nil
-						  :array-type 'list
-						  :object-type 'alist)
-			     (json-end-of-file nil)))
+			 parsed
 		       (error "dignified-elpa--auth-get %s"
 			      (with-current-buffer buffer
 				(buffer-substring-no-properties
