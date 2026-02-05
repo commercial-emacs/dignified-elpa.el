@@ -2,7 +2,6 @@ export VERSION := $(shell git describe --tags --abbrev=0 2>/dev/null || echo 0.0
 SHELL := /bin/bash
 EMACS ?= emacs
 ELSRC := dignified-elpa.el
-VERSION 
 .PHONY: compile
 compile: deps/archives/gnu/archive-contents
 	$(EMACS) -batch \
