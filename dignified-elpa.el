@@ -32,7 +32,6 @@
      ,@body))
 
 (defun dignified-elpa-packages ()
-  (package-initialize)
   (when-let ((dignified (cl-loop for (name . url) in package-archives when
 				 (string= (url-host (url-generic-parse-url url))
 					  "dignified-elpa.commandlinesystems.com")
@@ -316,7 +315,7 @@ Caller must clean it up."
 (defalias 'dignified-elpa #'dignified-elpa-dashboard)
 
 (add-hook 'package-refresh-contents-hook
-          (lambda () (setq dignified-packages (dignified-elpa-packages))))
+          (lambda (&rest_args) (setq dignified-packages (dignified-elpa-packages))))
 
 (provide 'dignified-elpa)
 ;;; dignified-elpa.el ends here
