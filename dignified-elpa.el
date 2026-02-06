@@ -163,6 +163,7 @@ Side effect squirrel changed tokens to disk."
 	      (ws-response-header process 200 '("Content-type" . "text/plain"))
 	      (process-send-string process "Thanks. Identity verified.\n")
 	      (process-send-eof process)
+	      (message "Thank you for your patronage")
 	      (throw 'success t)))))
 	 dignified-elpa-ws-port)
 	(browse-url dignified-elpa-hosted-ui)
