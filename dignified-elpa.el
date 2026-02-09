@@ -355,7 +355,7 @@ Caller must clean it up."
  :around (symbol-function 'package-install-from-archive)
  (lambda (f pkg-desc &rest args)
    (if (not (string= (url-host (url-generic-parse-url
-				(alist-get :url (package-desc-extras pkg-desc))))
+				(package-archive-base pkg-desc)))
 		     "dignified-elpa.commandlinesystems.com"))
        (apply f pkg-desc args)
      (let-alist (dignified-elpa--auth-get dignified-elpa-auth-url)
@@ -363,6 +363,10 @@ Caller must clean it up."
 	   (user-error (format "dignified-elpa: %s" .error))
 	 (dignified-elpa--request
 	   (apply f pkg-desc args)))))))
+
+;;;###autoload
+(add-to-list 'package-archives '("dignified" .
+				 "https://dignified-elpa.commandlinesystems.com/packages/"))
 
 (provide 'dignified-elpa)
 ;;; dignified-elpa.el ends here
