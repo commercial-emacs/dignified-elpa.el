@@ -56,4 +56,3 @@ retag:
 	2>/dev/null git push --delete origin $(VERSION) || true
 	git tag $(VERSION)
 	git push origin $(VERSION)
-

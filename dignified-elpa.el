@@ -53,22 +53,42 @@
 (defvar dignified-packages (dignified-elpa-packages))
 
 ;;;###autoload
-(defun dignify (package)
+(defun dignify (full-name)
   (interactive
    (list (let ((completion-styles '(substring flex)))
 	   (completing-read
 	    "Package: " dignified-packages
 	    (lambda (pkg) (null (locate-library (concat (symbol-name pkg) ".el"))))
 	    :must-match))))
-  (unless (string-empty-p (string-trim package))
-    (if (member package (mapcar #'symbol-name dignified-packages))
-	(dignified-elpa-checkout package)
-      (user-error "%s not among dignified packages" package))))
+  (unless (string-empty-p (string-trim full-name))
+    (if (member full-name (mapcar #'symbol-name dignified-packages))
+	(when (dignified-elpa-checkout full-name)
+	  (package-install
+	   (cl-find-if
+	    (lambda (desc)
+	      (and (equal (package-desc-archive desc)
+			  (cl-loop for (name . url) in package-archives when
+				   (string= (url-host (url-generic-parse-url url))
+					    "dignified-elpa.commandlinesystems.com")
+				   return name))
+		   (equal (file-relative-name
+			   (url-filename
+			    (url-generic-parse-url
+			     (alist-get :url (package-desc-extras desc))))
+			   "/")
+			  full-name)))
+	    (apply #'append (mapcar #'cdr package-archive-contents)))))
+      (user-error "%s not among dignified packages" full-name))))
 
 (defconst dignified-elpa-domain "dignified-elpa.commandlinesystems.com")
 (defconst dignified-elpa-auth "allaccess.auth.commandlinesystems.com")
 (defconst dignified-elpa-client "7li6vomknkgvomeqhj9674nlcb")
 (defconst dignified-elpa-ws-port 17973)
+
+(defconst dignified-elpa-auth-url
+  (url-recreate-url
+   (url-parse-make-urlobj "https" nil nil dignified-elpa-domain nil
+			  "/auth" nil nil t)))
 
 (defconst dignified-elpa-checkout-url
   (url-recreate-url
@@ -163,7 +183,6 @@ Side effect squirrel changed tokens to disk."
 	      (ws-response-header process 200 '("Content-type" . "text/plain"))
 	      (process-send-string process "Thanks. Identity verified.\n")
 	      (process-send-eof process)
-	      (message "Thank you for your patronage")
 	      (throw 'success t)))))
 	 dignified-elpa-ws-port)
 	(browse-url dignified-elpa-hosted-ui)
@@ -216,14 +235,14 @@ Side effect squirrel changed tokens to disk."
 	(ws-start
 	 '(((:POST . ".*") .
 	    (lambda (request)
-	      (with-slots (process headers) request
-		(ws-response-header
-		 process 303
-		 `("Location" . ,(if (assoc-default "success" headers)
-				     dignified-elpa-success-url
-				   dignified-elpa-cancel-url)))
-		(process-send-eof process)
-		(throw 'success (assoc-default "success" headers))))))
+	     (with-slots (process headers) request
+	      (ws-response-header
+	       process 303
+	       `("Location" . ,(if (assoc-default "success" headers)
+				dignified-elpa-success-url
+				dignified-elpa-cancel-url)))
+	      (process-send-eof process)
+	      (throw 'success (assoc-default "success" headers))))))
 	 dignified-elpa-ws-port)
 	(browse-url url)
 	(message "Blocking on checkout... C-g to abort")
@@ -238,7 +257,9 @@ Side effect squirrel changed tokens to disk."
 		      (url-build-query-string `(("name" ,repo)))))
     (if .error
 	(user-error (format "dignified-elpa-checkout: %s" .error))
-      (dignified-elpa-checkout-flow .url))))
+      (if (dignified-elpa-checkout-flow .url)
+	  (prog1 t (message "Thank you for your patronage"))
+	(prog1 nil (message "Checkout aborted"))))))
 
 (defun dignified-elpa--auth-get (url)
   (catch 'done
@@ -280,26 +301,31 @@ Side effect squirrel changed tokens to disk."
 	(unless (dignified-elpa-squirrel-tokens result)
 	  (throw 'done result))))))
 
+(defmacro dignified-elpa--request (&rest body)
+  (declare (indent defun))
+  `(let* (url-registered-auth-schemes
+	  (access-token (dignified-elpa-token "access_token"))
+	  (id-token (dignified-elpa-token "id_token"))
+	  (url-request-method "POST")
+	  (url-request-extra-headers `(("Content-Type" .
+					"application/x-www-form-urlencoded")
+				       ;; Dummy authorization so that
+				       ;; `url-http-handle-authentication'
+				       ;; doesn't keep trying.
+				       ("Authorization" .
+					"Basic")))
+	  (url-request-data (url-build-query-string
+			     `(,@(when access-token
+				   (list `("access_token" ,access-token)))
+			       ,@(when id-token
+				   (list `("id_token" ,id-token)))
+			       ("redirect_uri" ,dignified-elpa-redirect-url)))))
+     ,@body))
+
 (defun dignified-elpa--get (url)
   "Return cons of response code and buffer response.
 Caller must clean it up."
-  (let* (url-registered-auth-schemes
-	 (access-token (dignified-elpa-token "access_token"))
-	 (id-token (dignified-elpa-token "id_token"))
-	 (url-request-method "POST")
-	 (url-request-extra-headers `(("Content-Type" .
-				       "application/x-www-form-urlencoded")
-				      ;; Dummy authorization so that
-				      ;; `url-http-handle-authentication'
-				      ;; doesn't keep trying.
-				      ("Authorization" .
-				       "Basic")))
-	 (url-request-data (url-build-query-string
-			    `(,@(when access-token
-				 (list `("access_token" ,access-token)))
-			      ,@(when id-token
-				 (list `("id_token" ,id-token)))
-			      ("redirect_uri" ,dignified-elpa-redirect-url)))))
+  (dignified-elpa--request
     (let ((buffer (url-retrieve-synchronously url)))
       (cons (buffer-local-value 'url-http-response-status buffer) buffer))))
 
@@ -317,6 +343,20 @@ Caller must clean it up."
 
 (add-hook 'package-refresh-contents-hook
           (lambda (&rest_args) (setq dignified-packages (dignified-elpa-packages))))
+
+;;;###autoload
+(add-function
+ :around (symbol-function 'package-install-from-archive)
+ (lambda (f pkg-desc &rest args)
+   (if (not (string= (url-host (url-generic-parse-url
+				(alist-get :url (package-desc-extras pkg-desc))))
+		     "dignified-elpa.commandlinesystems.com"))
+       (apply f pkg-desc args)
+     (let-alist (dignified-elpa--auth-get dignified-elpa-auth-url)
+       (if .error
+	   (user-error (format "dignified-elpa: %s" .error))
+	 (dignified-elpa--request
+	   (apply f pkg-desc args)))))))
 
 (provide 'dignified-elpa)
 ;;; dignified-elpa.el ends here
