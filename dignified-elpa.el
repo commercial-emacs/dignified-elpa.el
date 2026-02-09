@@ -3,6 +3,12 @@
 ;; Version: 0.0.1
 ;; Package-Requires: ((emacs "25.1") (web-server "0.1.2"))
 
+;;; Commentary:
+
+;; Buy-side machinery.
+
+;; Come join the party.
+
 (require 'cl-lib)
 (require 'url-auth)
 (require 'json)
