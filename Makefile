@@ -2,6 +2,8 @@ export VERSION := $(shell git describe --tags --abbrev=0 2>/dev/null || echo 0.0
 SHELL := /bin/bash
 EMACS ?= emacs
 ELSRC := dignified-elpa.el
+INSTALLDIR ?= package-user-dir
+
 .PHONY: compile
 compile: deps/archives/gnu/archive-contents
 	$(EMACS) -batch \
@@ -12,7 +14,7 @@ compile: deps/archives/gnu/archive-contents
 	  -f batch-byte-compile $(ELSRC); \
 	  (ret=$$? ; rm -f $(ELSRC:.el=.elc) && exit $$ret)
 
-deps/archives/gnu/archive-contents: $(ELSRC)
+deps/archives/gnu/archive-contents:
 	$(call install-recipe,$(CURDIR)/deps)
 	rm -rf deps/dignified-elpa*
 
@@ -41,7 +43,7 @@ define install-recipe
 	INSTALL_PATH=$(1); \
 	if [[ "$${INSTALL_PATH}" == /* ]]; then INSTALL_PATH=\"$${INSTALL_PATH}\"; fi; \
 	PKG_NAME=`$(EMACS) -batch -L . -l dignified-elpa-package --eval "(princ (dignified-elpa-package-name))"`; \
-	$(EMACS) --batch -l package --eval "(setq package-user-dir (expand-file-name $${INSTALL_PATH}))" \
+	$(EMACS) --batch -l package --eval "(setq package-user-dir (expand-file-name $${INSTALL_PATH}) package-archives (quote ((\"shmelpa\" . \"https://shmelpa.commandlinesystems.com/packages/\"))))" \
 	  -f package-initialize \
 	  --eval "(ignore-errors (apply (function package-delete) (alist-get (quote dignified-elpa) package-alist)))" \
 	  -f package-refresh-contents \
@@ -56,3 +58,7 @@ retag:
 	2>/dev/null git push --delete origin $(VERSION) || true
 	git tag $(VERSION)
 	git push origin $(VERSION)
+
+.PHONY: install
+install:
+	$(call install-recipe,$(INSTALLDIR))

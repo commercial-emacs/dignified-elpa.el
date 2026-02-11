@@ -1,7 +1,7 @@
 ;;; dignified-elpa.el --- line for checkout -*- lexical-binding: t; -*-
 
 ;; Version: 0.0.1
-;; Package-Requires: ((emacs "25.1") (web-server "0.1.2"))
+;; Package-Requires: ((emacs "29.1") (web-server "0.1.3pre"))
 
 ;;; Commentary:
 
@@ -13,12 +13,6 @@
 (require 'url-auth)
 (require 'json)
 (require 'web-server)
-
-(eval-when-compile
-  (when (< emacs-major-version 29)
-    (defun seq-keep (function sequence)
-      "Apply FUNCTION to SEQUENCE and return all non-nil results."
-      (delq nil (seq-map function sequence)))))
 
 (defvar url-http-end-of-headers)
 
@@ -354,6 +348,7 @@ Caller must clean it up."
 (add-function
  :around (symbol-function 'package-install-from-archive)
  (lambda (f pkg-desc &rest args)
+   (require 'dignified-elpa)
    (if (not (string= (url-host (url-generic-parse-url
 				(package-archive-base pkg-desc)))
 		     "dignified-elpa.commandlinesystems.com"))
@@ -365,8 +360,12 @@ Caller must clean it up."
 	   (apply f pkg-desc args)))))))
 
 ;;;###autoload
-(add-to-list 'package-archives '("dignified" .
-				 "https://dignified-elpa.commandlinesystems.com/packages/"))
+(let ((h (lambda ()
+	   (add-to-list
+	    'package-archives
+	    '("dignified" .
+	      "https://dignified-elpa.commandlinesystems.com/packages/")))))
+  (add-hook 'after-init-hook h))
 
 (provide 'dignified-elpa)
 ;;; dignified-elpa.el ends here
