@@ -32,6 +32,8 @@
      ,@body))
 
 (defun dignified-elpa-packages ()
+  (unless package-archive-contents
+    (package-refresh-contents))
   (when-let ((dignified (cl-loop for (name . url) in package-archives when
 				 (string= (url-host (url-generic-parse-url url))
 					  "dignified-elpa.commandlinesystems.com")
