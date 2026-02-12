@@ -32,8 +32,10 @@
      ,@body))
 
 (defun dignified-elpa-packages ()
-  (unless package-archive-contents
-    (package-refresh-contents))
+  (let ((package-refresh-contents-hook
+	 (delq 'dignified-elpa-refresh-contents-hook package-refresh-contents-hook)))
+    (unless package-archive-contents
+      (package-refresh-contents)))
   (when-let ((dignified (cl-loop for (name . url) in package-archives when
 				 (string= (url-host (url-generic-parse-url url))
 					  "dignified-elpa.commandlinesystems.com")
@@ -53,6 +55,12 @@
 		       (mapcar #'cdr package-archive-contents)))))
 
 (defvar dignified-packages (dignified-elpa-packages))
+
+(defalias 'dignified-elpa-refresh-contents-hook
+  (lambda (&rest_args) (setq dignified-packages (dignified-elpa-packages))))
+
+(add-hook 'package-refresh-contents-hook
+	  'dignified-elpa-refresh-contents-hook)
 
 ;;;###autoload
 (defun dignify (full-name)
@@ -342,9 +350,6 @@ Caller must clean it up."
 	 "Purchases" ,(string-join (or .purchases '("None")) ", "))))))
 
 (defalias 'dignified-elpa #'dignified-elpa-dashboard)
-
-(add-hook 'package-refresh-contents-hook
-          (lambda (&rest_args) (setq dignified-packages (dignified-elpa-packages))))
 
 ;;;###autoload
 (add-function
