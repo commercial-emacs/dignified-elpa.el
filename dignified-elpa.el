@@ -364,7 +364,15 @@ Caller must clean it up."
        (if .error
 	   (user-error (format "dignified-elpa: %s" .error))
 	 (dignified-elpa--request
-	   (apply f pkg-desc args)))))))
+	  (apply f pkg-desc args)))))))
+
+;;;###autoload
+(with-eval-after-load 'lisp-mnt
+  (add-function
+   :around (symbol-function 'lm-commentary)
+   (lambda (f &rest args)
+     "Pulling a fast one"
+     (ignore-errors (apply f args)))))
 
 ;;;###autoload
 (let ((h (lambda ()
