@@ -339,6 +339,7 @@ Caller must clean it up."
     (let ((buffer (url-retrieve-synchronously url)))
       (cons (buffer-local-value 'url-http-response-status buffer) buffer))))
 
+;;;###autoload
 (defun dignified-elpa-dashboard ()
   (interactive)
   (with-help-window "*Dignified Elpa*"
@@ -349,6 +350,7 @@ Caller must clean it up."
 	 "User" ,(alist-get 'email (dignified-elpa-id-token-alist))
 	 "Purchases" ,(string-join (or .purchases '("None")) ", "))))))
 
+;;;###autoload
 (defalias 'dignified-elpa #'dignified-elpa-dashboard)
 
 ;;;###autoload
