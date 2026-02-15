@@ -1,0 +1,36 @@
+SELLERS
+-------
+git clone https://github.com/commercial-emacs/dignified-elpa.el
+make -C dignified-elpa.el install
+
+https://github.com/apps/dignified-elpa -- install for one repo to start.
+
+Create .github/workflows/release.yml in that repo -- decide which
+files go into the package.
+
+```
+name: Release
+on:
+  release:
+    types: [published]
+
+jobs:
+  build:
+    uses: commercial-emacs/dignified-elpa/.github/workflows/build.yml@v1
+    with:
+      files: "your-package.el dir/other.el README"
+```
+
+Each tagging of a release publishes to Dignified Elpa.
+
+To sell source code, https://dignified-elpa.commandlinesystems.com/dashboard
+and "Complete Stripe".
+
+
+BUYERS
+------
+git clone https://github.com/commercial-emacs/dignified-elpa.el
+make -C dignified-elpa.el install
+Try out any Dignified Elpa package via M-x list-packages.
+To purchase source code, M-x dignify.
+To see purchases M-x dignified-elpa.
