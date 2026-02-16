@@ -191,7 +191,7 @@ Side effect squirrel changed tokens to disk."
 			 (cdr pair)))
 		headers))
 	      (ws-response-header process 200 '("Content-type" . "text/plain"))
-	      (process-send-string process "Thanks. Identity verified.\n")
+	      (process-send-string process "Identity verified.  You may close this tab.\n")
 	      (process-send-eof process)
 	      (throw 'success t)))))
 	 dignified-elpa-ws-port)
