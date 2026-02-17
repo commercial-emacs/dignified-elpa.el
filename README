@@ -23,7 +23,7 @@ jobs:
 
 Each tagging of a release publishes to Dignified Elpa.
 
-To sell source code, https://dignified-elpa.commandlinesystems.com/dashboard
+To begin collecting payments, https://dignified-elpa.commandlinesystems.com/dashboard
 provide "Additional Info".
 
 
@@ -32,5 +32,5 @@ BUYERS
 git clone https://github.com/commercial-emacs/dignified-elpa.el
 make -C dignified-elpa.el install
 Try out any Dignified Elpa package via M-x list-packages.
-To purchase source code, M-x dignify.
+To purchase, M-x dignify.
 To see purchases M-x dignified-elpa.
